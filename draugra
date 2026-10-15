@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+draugra=$(dirname $(realpath ${BASH_SOURCE[0]}))
+database=${draugra}/db.json
+
+case "$1" in
+    run) exec "${draugra}/draugra-run" ;;
+    add) exec "${draugra}/draugra-add" ;;
+esac

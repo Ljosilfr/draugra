@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+draugra=$(realpath ${BASH_SOURCE[0]%/*})
+database=${draugra}/db.json
+profiles=${draugra}/umu-profiles
+titles=${draugra}/index_titles
+source "${draugra}/gum.conf"
+#--------------------------------------------------------------------------------------
+proton="$HOME/.local/share/Steam/compatibilitytools.d/proton-cachyos-10.0-sunset-slr"
+#--------------------------------------------------------------------------------------
+[[ -f "${database}" ]] || echo '{}' > "${database}"
+
+type=$(gum choose --header="What type of game is it?" "Native" "Proton" || exit 1) 
+#------------------------------------------------------------------------
+y_file_picker() { yazi --chooser-file=/tmp/yazi-choice; cat /tmp/yazi-choice; rm_y; }
+
+def_id() { id=$(echo ${title,,}| sed 's/[^a-z ]//gi; s/ /-/gi'); }
+
+def_title() {
+    if ! gum confirm "Wanna type a custom name?"; then 
+         title=$(cat ${titles} | fzf --info=hidden --reverse --input-border=sharp)
+    else title=$(gum input); fi || exit 1
+}
+
+rm_y() { rm -f /tmp/yazi-choice; }
+
+add_native() {
+    rm_y; def_title; [[ -z "${title}" ]] && exit 1
+
+    gum confirm "Select the binary path" --affirmative="Next" --negative="Cancel" || exit 1 
+    binary=$(y_file_picker)
+        
+    def_id; [[ -z "${id}" ]] && exit 1; rg "${id}" "${database}" &>/dev/null && {
+    echo "A game named exactly the same already exists in the database"; exit 1; }
+    
+    jq --arg id "${id}" --arg title "${title}" --arg binary "${binary}" \
+       '.[$id] += {"title": $title, "binary": $binary}' \
+       "${database}" > tmp.json && mv tmp.json "${database}" || exit 1; rm_y; exit
+}
+
+add_proton() {
+    rm_y; def_title; [[ -z "${title}" ]] && exit 1
+    
+    gum confirm "Select the executable path" --affirmative="Next" --negative="Cancel" || exit 1
+    executable=$(y_file_picker)
+    
+    gum confirm "Select the prefix path" --affirmative="Next" --negative="Cancel" || exit 1
+    prefix=$(y_file_picker)
+    
+    gum confirm "Use default proton version? → $(basename ${proton})" || {
+    gum confirm "Select proton path" --affirmative="Next" --negative="Cancel"
+    proton=$(y_file_picker); }
+    
+    def_id; [[ -z "${id}" ]] && exit 1; rg "${id}" "${database}" &>/dev/null && {
+    echo "A game named exactly the same already exists in the database"; exit 1; }
+    
+    new_profile="${profiles}/${id}.toml"
+    
+    jq --arg id "${id}" --arg title "${title}" --arg profile "${new_profile}" \
+       '.[$id] += {"title": $title, "profile": $profile }' \
+       "${database}" > tmp.json && mv tmp.json "${database}" || exit 1
+    
+    [[ -f "${new_profile}" ]] && { gum confirm "A profile with that name already exists, overwrite?" || exit; }
+    
+cat << EOF > ${new_profile}
+[umu]
+prefix = "${prefix}"
+proton = "${proton}"
+game_id = "0"
+exe = "${executable}"
+EOF
+    rm_y; exit;
+}
+
+case "${type,,}" in
+    native) add_native ;;
+    proton) add_proton ;;
+esac

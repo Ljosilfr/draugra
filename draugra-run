@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+pkill -x rofi && exit
+draugra=$(realpath ${BASH_SOURCE[0]%/*})
+database=${draugra}/db.json
+
+menu=$(jq -r '.[].title' ${database} | sort | rofi -sync -dmenu -i -p ">" -no-fixed-num-lines -theme simple_menu \
+    -theme-str "window {width: 26em;} listview {lines: 25; margin: 0.4em 0 0;}")
+    
+fuel=$(jq -r --arg it "${menu}" '.[] | select(.title == $it) | .binary // .profile' ${database})
+
+[[ -z "${fuel}" ]] && exit 1; export mesa_glthread=true
+
+case "${fuel}" in
+    *.toml)
+        source "${draugra}/proton.conf"
+        cd "$(dirname $(taplo get --file-path "${fuel}" 'umu.exe' -o value))"
+        gamemoderun umu-run --config "${fuel}"
+        ;;
+    *)
+        file "${fuel}" | rg "executable" &>/dev/null || {
+        echo "Error: file set as binary is not an executable"; exit 1; }
+        exec "${fuel}"
+        ;; 
+esac
