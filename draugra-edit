@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+draugra=$(realpath ${BASH_SOURCE[0]%/*})
+database=${draugra}/db.json
+profiles=${draugra}/umu-profiles
+titles=${draugra}/index_titles
+
+source "${draugra}/gum.conf"
+
+title=$(jq -r '.[].title' "${database}" | sort | gum choose); [[ -z "${title}" ]] && exit 1
+choice=$(gum choose "Edit" "Delete"); [[ -z "${choice}" ]] && exit 1
+
+temp_db="${draugra}/db_temp.json"
+rm_temp() { rm -f ${draugra}/*_temp.json; }
+
+id=$(echo "${title,,}" | sed 's/[^a-z ]//gi; s/ /-/gi')
+
+abort_if_failed() { [[ "${?}" -eq 1 ]] && { rm_temp; exit 1; }; }
+
+case "${choice,,}" in
+    delete)
+        jq --arg id "${id}" 'del(.[$id])' "${database}" > "${temp_db}" && {
+            mv "${temp_db}" "${database}"; }; abort_if_failed; rm_temp
+    ;;
+    edit)
+        temp_edit="${draugra}/edit_temp.json"
+        temp_merged="${draugra}/merged_temp.json"
+
+        jq --arg id "${id}" '{$id: .[$id]}' "${database}" > "${temp_edit}" && {
+           jq --arg id "${id}" 'del(.[$id])' "${database}" > "${temp_db}"
+        }; abort_if_failed
+
+        $EDITOR "${temp_edit}"
+        
+        jq -s '.[0] + .[1]' "${temp_edit}" "${temp_db}" > "${temp_merged}" && \
+        mv "${temp_merged}" "${database}"
+        abort_if_failed; rm_temp
+    ;;
+esac; rm_temp

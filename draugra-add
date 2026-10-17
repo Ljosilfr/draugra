@@ -35,6 +35,8 @@ add_native() {
     jq --arg id "${id}" --arg title "${title}" --arg binary "${binary}" \
        '.[$id] += {"title": $title, "binary": $binary}' \
        "${database}" > tmp.json && mv tmp.json "${database}" || exit 1; rm_y; exit
+       
+    rm_y; echo "Done!"; read; exit;
 }
 
 add_proton() {
@@ -68,7 +70,7 @@ proton = "${proton}"
 game_id = "0"
 exe = "${executable}"
 EOF
-    rm_y; exit;
+    rm_y; echo "Done!"; read; exit;
 }
 
 case "${type,,}" in
