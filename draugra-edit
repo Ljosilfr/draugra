@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+tty -s || { footclient "${0}" "${@}"; exit; }
+
 draugra=$(realpath ${BASH_SOURCE[0]%/*})
 database=${draugra}/db.json
 profiles=${draugra}/umu-profiles

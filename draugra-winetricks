@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+tty -s || { footclient "${0}" "${@}"; exit; }
+
+y_picker() { yazi --chooser-file=/dev/stdout; }
+
+echo "pick proton binary"; read
+proton="$(y_picker)"
+
+echo "pick proton prefix"; read
+prefix="$(y_picker)"
+
+export WINE="${proton}"
+export WINEPREFIX="${prefix}"
+
+winetricks "${@}"

@@ -5,4 +5,5 @@ database=${draugra}/db.json
 case "$1" in
     run) exec "${draugra}/draugra-run" ;;
     add) exec "${draugra}/draugra-add" ;;
+    edit) exec "${draugra}/draugra-edit" ;;
 esac
