@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 source "$(dirname $(realpath ${BASH_SOURCE[0]}))/common.sh"
 
-y_picker() { yazi --chooser-file=/dev/stdout "${1}"; }
-
-gum confirm "Use default PROTON build BINARY? → $(basename "${proton}" )" || {
+gum confirm "Use default PROTON build BINARY? → $(basename "${std_proton_build}" )" || {
 	gum confirm "Pick the PROTON build BINARY" --affirmative=Next --negative=Cancel || exit 1
-	proton="$(y_picker "${proton_builds}")"
+	chosen_proton_build="$(y_picker "${std_proton_home}")"
 }
 
 gum confirm "Pick the PROTON PREFIX" --affirmative=Next --negative=Cancel || exit 1
 prefix="$(y_picker "${prefixes}")"
 
-export WINE="${proton}"
+export WINE="${chosen_proton_build}"
 export WINEPREFIX="${prefix}"
 
 winetricks "${@}"

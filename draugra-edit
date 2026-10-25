@@ -5,6 +5,9 @@ title=$(jq -r '.[].title' "${database}" | sort | gum choose); [[ -z "${title}" ]
 choice=$(gum choose "Edit" "Delete"); [[ -z "${choice}" ]] && exit 1
 
 temp_db="${_root}/db_temp.json"
+temp_edit="${_root}/edit_temp.json"
+temp_merged="${_root}/merged_temp.json"
+
 rm_temp() { rm -f "${_root}/*_temp.json"; }
 
 id="$(echo "${title,,}" | sed 's/[^a-z 0-9]//gi; s/ /-/gi')"
@@ -13,13 +16,14 @@ abort_if_failed() { [[ "${?}" -eq 1 ]] && { rm_temp; }; }
 
 case "${choice,,}" in
 	delete)
+		gum confirm "Are you sure?" || exit 1
+
 		jq --arg id "${id}" 'del(.[$id])' "${database}" > "${temp_db}" && {
 			mv "${temp_db}" "${database}"; }; abort_if_failed && exit 1
 		[[ -f "${profiles}/${id}.toml" ]] && rm -f "${profiles}/${id}.toml"
 	;;
 	edit)
-		temp_edit="${_root}/edit_temp.json"
-		temp_merged="${_root}/merged_temp.json"
+		gum confirm "Are you sure?" || exit 1
 
 		jq --arg id "${id}" '{$id: .[$id]}' "${database}" > "${temp_edit}" && {
 			jq --arg id "${id}" 'del(.[$id])' "${database}" > "${temp_db}"
