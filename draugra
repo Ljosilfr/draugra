@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-draugra=$(dirname $(realpath ${BASH_SOURCE[0]}))
-database=${draugra}/db.json
+source "$(dirname $(realpath ${BASH_SOURCE[0]}))/common.sh"
+source "${std_gum_settings}"
 
-case "$1" in
-    run) exec "${draugra}/draugra-run" ;;
-    add) exec "${draugra}/draugra-add" ;;
-    edit) exec "${draugra}/draugra-edit" ;;
+[[ "${1}" == "run" ]] && { "${_root}/draugra-run" & disown; exit; }
+
+run_in_termn
+
+msgs=('Add game to DB' 'Edit existing DB object' 'Run Winetricks')
+action="$(gum choose "${msgs[0]}" "${msgs[1]}" "${msgs[2]}" || exit 1)"
+
+case "${action}" in
+	"${msgs[0]}") exec "${_root}/draugra-add" ;;
+	"${msgs[1]}") exec "${_root}/draugra-edit" ;;
+	"${msgs[2]}") exec "${_root}/draugra-winetricks" ${@} ;;
 esac

@@ -1,77 +1,71 @@
 #!/usr/bin/env bash
-tty -s || { footclient "${0}" "${@}"; exit; }
+source "$(dirname $(realpath ${BASH_SOURCE[0]}))/common.sh"
 
-draugra=$(realpath ${BASH_SOURCE[0]%/*})
-database=${draugra}/db.json
-profiles=${draugra}/umu-profiles
-titles=${draugra}/index_titles
-source "${draugra}/gum.conf"
-#--------------------------------------------------------------------------------------
-proton="$HOME/.local/share/Steam/compatibilitytools.d/proton-cachyos-10.0-sunset-slr"
-#--------------------------------------------------------------------------------------
 [[ -f "${database}" ]] || echo '{}' > "${database}"
 
-#------------------------------------------------------------------------
-y_picker() { yazi --chooser-file=/dev/stdout ; }
+y_picker() { yazi --chooser-file=/dev/stdout "${1}"; }
 
-def_id() { id=$(echo ${title,,}| sed 's/[^a-z ]//gi; s/ /-/gi'); }
+def_id() { id="$(echo "${title,,}" | sed 's/[^a-z 0-9]//gi; s/ /-/gi')"; }
 
 def_title() {
-    if ! gum confirm "Wanna type a custom name?"; then 
-         title=$(cat ${titles} | fzf --info=hidden --reverse --input-border=sharp)
-    else title=$(gum input); fi || exit 1
+	if ! gum confirm "Wanna type a custom name?"; then 
+	title="$(cat "${titles}" | fzf --info=hidden --reverse --input-border=sharp)" || exit 1
+	else title="$(gum input || exit 1)"; fi || exit 1
 }
 
 add_native() {
-    def_title; [[ -z "${title}" ]] && exit 1
+	def_title; [[ -z "${title}" ]] && exit 1
 
-    gum confirm "Pick the binary file" --affirmative="Next" --negative="Cancel" || exit 1 
-    binary="$(y_picker)"
-        
-    def_id; [[ -z "${id}" ]] && exit 1; rg "${id}" "${database}" &>/dev/null && {
-    echo "A game named exactly the same already exists in the database"; exit 1; }
-    
-    jq --arg id "${id}" --arg title "${title}" --arg binary "${binary}" \
-       '.[$id] += {"title": $title, "binary": $binary}' \
-       "${database}" > tmp.json && mv tmp.json "${database}" || exit 1; rm_y; exit
+	gum confirm "Pick the BINARY file" --affirmative=Next --negative=Cancel || exit 1 
+	binary="$(y_picker "${games}")"
+
+	def_id; [[ -z "${id}" ]] && exit 1; rg "${id}" "${database}" &>/dev/null && {
+	echo "A game named exactly the same already exists in the database"; exit 1; }
+
+	jq --arg id "${id}" --arg title "${title}" --arg binary "${binary}" \
+		'.[$id] += {"title": $title, "binary": $binary}' \
+		"${database}" > "${_root}/tmp.json" && mv "${_root}/tmp.json" "${database}" || exit 1
 }
 
 add_proton() {
-    def_title; [[ -z "${title}" ]] && exit 1
-    
-    gum confirm "Pick the dot-exe file" --affirmative="Next" --negative="Cancel" || exit 1
-    executable="$(y_picker)"
-    
-    gum confirm "Pick the prefix folder" --affirmative="Next" --negative="Cancel" || exit 1
-    prefix="$(y_picker)"
-    
-    gum confirm "Use default proton version? → $(basename ${proton})" || {
-    gum confirm "Pick Proton version" --affirmative="Next" --negative="Cancel" || exit 1
-    proton="$(y_picker)"; }
-    
-    def_id; [[ -z "${id}" ]] && exit 1; rg "${id}" "${database}" &>/dev/null && {
-        echo "A game with that name already exists in the database"; exit 1; }
-    
-    new_profile="${profiles}/${id}.toml"
-    
-    jq --arg id "${id}" --arg title "${title}" --arg profile "${new_profile}" \
-       '.[$id] += {"title": $title, "profile": $profile }' \
-       "${database}" > tmp.json && mv tmp.json "${database}" || exit 1
-    
-    [[ -f "${new_profile}" ]] && { gum confirm "A profile with that name already exists in ${profiles}, overwrite?" || exit; }
-    
-cat << EOF > "${new_profile}"
-[umu]
-prefix = "${prefix}"
-proton = "${proton}"
-game_id = "0"
-exe = "${executable}"
-EOF
+	def_title; [[ -z "${title}" ]] && exit 1
+
+	gum confirm "Pick the DOT-EXE file" --affirmative=Next --negative=Cancel || exit 1
+	executable="$(y_picker "${games}")"
+
+	file "${executable}" | rg -i "executable.*windows" &>/dev/null || {
+	echo "The file picked isn't a windows executable, closing"; exit 1; }
+
+	gum confirm "Pick the PREFIX folder" --affirmative=Next --negative=Cancel || exit 1
+	prefix="$(y_picker "${prefixes}")"
+
+	gum confirm "Use the default PROTON build? → $(basename "${std_proton_build}")" || {
+	gum confirm "Pick the desired PROTON build" --affirmative=Next --negative=Cancel || exit 1
+	proton="$(y_picker "${std_proton_home}")"; }
+
+	def_id; [[ -z "${id}" ]] && exit 1; rg "${id}" "${database}" &>/dev/null && {
+		echo "A game with that name already exists in the database"; exit 1; }
+
+	new_profile="${profiles}/${id}.toml"
+
+	jq --arg id "${id}" --arg title "${title}" --arg profile "${new_profile}" \
+		'.[$id] += {"title": $title, "profile": $profile }' \
+		"${database}" > "${_root}/tmp.json" && mv "${_root}/tmp.json" "${database}" || exit 1
+
+	[[ -f "${new_profile}" ]] && { gum confirm "A profile with that name already exists in ${profiles}, overwrite?" || exit 0; }
+
+	cat <<-EOF > "${new_profile}"
+	[umu]
+	prefix = "${prefix}"
+	proton = "${std_proton_build}"
+	game_id = "0"
+	exe = "${executable}"
+	EOF
 }
 
 type=$(gum choose --header="What type of game is it?" "Proton" "Native" || exit 1) 
 
 case "${type,,}" in
-    native) add_native ;;
-    proton) add_proton ;;
-esac; echo "Done!"; read; exit;
+	native) add_native ;;
+	proton) add_proton ;;
+esac && { echo "Done!"; read; exit; }

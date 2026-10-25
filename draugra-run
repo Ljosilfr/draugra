@@ -1,31 +1,29 @@
 #!/usr/bin/env bash
-#———————————————————————|
+source "$(dirname $(realpath ${BASH_SOURCE[0]}))/common.sh"
+
 pkill -x rofi && exit
-#-------------------------------------------
-draugra="$(realpath ${BASH_SOURCE[0]%/*})"
-database="${draugra}/db.json"
-#——————————————————————————————————————————————————————————————————————————————————————————————————————|
+
 menu=$(jq -r '.[].title' "${database}" | sort | rofi -dmenu -sync -i -p ">" -no-fixed-num-lines \
-    -theme simple_menu -theme-str "window {width: 23.5em;} listview {lines: 25; margin: 0.4em 0 0;}")
-#-----------------------------------------------------------------------------------------------------
+	-theme simple_menu -theme-str "window {width: 23.5em;} listview {lines: 25; margin: 0.4em 0 0;}")
+
 [[ -z "${menu}" ]] && exit 1; fuel=$(jq -r --arg fuel "${menu}" \
-'.[] | select(.title == $fuel) | .binary // .profile' ${database})
-#————————————————————————————————————————————————————————————————————————————————|
+'.[] | select(.title == $fuel) | .binary // .profile' "${database}")
+
 [[ -n "${fuel}" ]] && {
-     export mesa_glthread=true
-     case "${fuel}" in
-         *.toml)
-             fuel_dir="$(taplo get -f "${fuel}" 'umu.exe' -o value)"
-             source "${draugra}/proton.conf"
-             cd "${fuel_dir%/*}" || exit 1
-             gamemoderun umu-run --config "${fuel}"
-             ;;
-         *)
-             file "${fuel}" | rg "executable|script" &>/dev/null || {
-             echo "Error: file set as binary is not an executable"; exit 1; }
-             cd "${fuel%/*}" || exit 1
-             exec gamemoderun "${fuel}"
-             ;; 
-     esac
+	export mesa_glthread=true
+	case "${fuel}" in
+		*.toml)
+			[[ -f "${fuel}" ]] || { echo "Error: file ${fuel} does not exist"; exit 1; }
+			fuel_dir="$(taplo get -f "${fuel}" 'umu.exe' -o value)"
+			source "${_root}/proton.conf"; cd "${fuel_dir%/*}" || { exit 1; } && \
+				gamemoderun umu-run --config "${fuel}"
+			;;
+		 *)
+			[[ -f "${fuel}" ]] || { echo "Error: file ${fuel} does not exist"; exit 1; }
+			file "${fuel}" | rg "executable|script" &>/dev/null || {
+				echo "Error: file set as binary is not an executable"; exit 1; }
+			cd "${fuel%/*}" || { exit 1; } && { source "${std_proton_settings}"
+				gamemoderun "${fuel}"; }
+			;; 
+	 esac
 } || exit 1
-#————————————————————————————————————————————————————————————————————————————————|
